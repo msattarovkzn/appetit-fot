@@ -82,6 +82,7 @@ class DashboardDay(BaseModel):
     branch_id: int
     branch_name: str
     revenue: Decimal | None
+    orders_count: int | None
     total_fot: Decimal | None
     kitchen_fot: Decimal | None
     total_fot_pct: Decimal | None

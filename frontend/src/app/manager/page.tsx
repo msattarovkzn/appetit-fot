@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 type DashRow = {
   date: string; branch_id: number; branch_name: string;
-  revenue: number | null; total_fot: number | null;
+  revenue: number | null; orders_count: number | null; total_fot: number | null;
   total_fot_pct: number | null; kitchen_fot_pct: number | null;
   kitchen_fot: number | null;
   status_total: string | null; status_kitchen: string | null; open_shifts: number;
@@ -134,7 +134,9 @@ export default function ManagerPage() {
                         ? <span className="font-medium">{fmt(r.revenue)} ₽</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-500">—</td>
+                    <td className="px-4 py-3 text-right text-gray-500">
+                      {r.orders_count != null ? r.orders_count : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {r.total_fot != null
                         ? `${fmt(r.total_fot)} ₽`

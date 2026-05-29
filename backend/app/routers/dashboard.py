@@ -99,6 +99,19 @@ async def get_dashboard(
         key = (s.branch_id, s.date)
         open_count[key] = open_count.get(key, 0) + 1
 
+    reports_result = await db.execute(
+        select(BranchDailyReport).where(
+            and_(
+                BranchDailyReport.branch_id.in_(branch_ids),
+                BranchDailyReport.date >= from_date,
+                BranchDailyReport.date <= to_date,
+            )
+        )
+    )
+    orders_map: dict[tuple, int] = {}
+    for r in reports_result.scalars().all():
+        orders_map[(r.branch_id, r.date)] = r.orders_count
+
     rows = []
     current = from_date
     while current <= to_date:
@@ -109,6 +122,7 @@ async def get_dashboard(
                 branch_id=bid,
                 branch_name=branch_map[bid].name,
                 revenue=fs.revenue if fs else None,
+                orders_count=orders_map.get((bid, current)),
                 total_fot=fs.total_fot if fs else None,
                 kitchen_fot=fs.kitchen_fot if fs else None,
                 total_fot_pct=fs.total_fot_pct if fs else None,
