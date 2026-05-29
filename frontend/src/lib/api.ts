@@ -340,5 +340,75 @@ export const api = {
     request<{ id: number; name: string; is_active: boolean; employee_count: number }>(
       `/admin/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }
     ),
+
+  // ── Admin: shifts (correction, manual close) ─────────────────────────────
+  adminGetShifts: (params: { from_date: string; to_date: string; branch_id?: number; employee_id?: number; status?: string }) => {
+    const p = new URLSearchParams({ from_date: params.from_date, to_date: params.to_date })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    if (params.employee_id) p.append('employee_id', String(params.employee_id))
+    if (params.status) p.append('status', params.status)
+    return request<Array<{
+      id: number; employee_id: number; employee_name: string
+      branch_id: number; branch_name: string
+      date: string; opened_at: string | null; closed_at: string | null
+      approved_hours: number | null; status: string
+      is_corrected: boolean; note: string | null
+    }>>(`/admin/shifts?${p}`)
+  },
+
+  adminCorrectShift: (shift_id: number, approved_hours: number, note?: string) =>
+    request<{ ok: boolean; shift_id: number; approved_hours: number }>(
+      `/admin/shifts/${shift_id}`,
+      { method: 'PATCH', body: JSON.stringify({ approved_hours, note }) }
+    ),
+
+  // ── Admin: monthly report ────────────────────────────────────────────────
+  adminMonthlyReport: (year: number, month: number, branch_id?: number) => {
+    const p = new URLSearchParams({ year: String(year), month: String(month) })
+    if (branch_id) p.append('branch_id', String(branch_id))
+    return request<{
+      year: number; month: number; branch_id: number | null
+      rows: Array<{
+        employee_id: number; employee_name: string
+        position: string; category: string
+        payment_type: string; rate: number
+        days_worked: number; total_hours: number
+        base_pay: number; bonus: number; total_pay: number
+        has_corrections: boolean
+      }>
+      total_hours: number; total_pay: number
+    }>(`/admin/monthly-report?${p}`)
+  },
+
+  // ── Admin: corrections log ───────────────────────────────────────────────
+  adminCorrectionsLog: (params: { from_date: string; to_date: string; branch_id?: number }) => {
+    const p = new URLSearchParams({ from_date: params.from_date, to_date: params.to_date })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    return request<Array<{
+      id: number; date: string; employee_name: string
+      approved_hours: number; total_pay: number
+      notes: string | null; corrected_by: string; corrected_at: string | null
+    }>>(`/admin/corrections-log?${p}`)
+  },
+
+  // ── Admin: plan vs fact ───────────────────────────────────────────────────
+  adminPlanVsFact: (week_start: string, branch_id: number) =>
+    request<{
+      week_start: string; week_end: string; branch_id: number
+      rows: Array<{
+        employee_id: number; employee_name: string
+        planned_hours: number; actual_hours: number; diff: number
+      }>
+    }>(`/admin/plan-vs-fact?week_start=${week_start}&branch_id=${branch_id}`),
+
+  // ── Admin: violations ─────────────────────────────────────────────────────
+  adminViolations: (params: { from_date: string; to_date: string; branch_id?: number }) => {
+    const p = new URLSearchParams({ from_date: params.from_date, to_date: params.to_date })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    return request<Array<{
+      employee_id: number; employee_name: string; branch_name: string
+      unclosed: number; manual_closed: number; total: number; last_incident: string
+    }>>(`/admin/violations?${p}`)
+  },
   // ─────────────────────────────────────────────────────────────────────────
 }

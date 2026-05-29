@@ -2,23 +2,106 @@
 Admin router: employee and position management.
 Access: accountant + owner only.
 """
+import calendar
 from datetime import date, timedelta, datetime, timezone
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, delete
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.employee import Employee, EmployeeRate
-from app.models.position import Position
+from app.models.position import Position, PositionCategory
 from app.models.user import User
-from app.dependencies import require_accountant
+from app.models.shift import Shift, ShiftStatus
+from app.models.payroll import PayrollEntry, FotSummary, FotStatus
+from app.models.report import BranchDailyReport
+from app.models.schedule import SchedulePlan
+from app.models.branch import Branch
+from app.dependencies import require_accountant, require_manager
 from app.schemas.admin import (
     EmployeeCreate, EmployeeUpdate, EmployeeListItem, EmployeeDetail,
     PositionCreate, PositionUpdate, PositionOut,
     RateCreate, RateOut,
 )
 from app.utils.security import hash_pin, make_pin_check
+
+ZERO = Decimal("0")
+
+
+def _fot_status_total(pct: Decimal) -> FotStatus:
+    if pct < Decimal("27.5"): return FotStatus.green
+    if pct <= Decimal("29"): return FotStatus.yellow
+    return FotStatus.red
+
+
+def _fot_status_kitchen(pct: Decimal) -> FotStatus:
+    if pct < Decimal("14.5"): return FotStatus.green
+    if pct <= Decimal("15.5"): return FotStatus.yellow
+    return FotStatus.red
+
+
+async def _recalculate_fot_summary(db: AsyncSession, branch_id: int, work_date: date) -> None:
+    """Пересчитать FotSummary на основе всех PayrollEntry за день (включая скорректированные)."""
+    # Получить выручку из отчёта
+    report_res = await db.execute(
+        select(BranchDailyReport).where(
+            and_(BranchDailyReport.branch_id == branch_id, BranchDailyReport.date == work_date)
+        )
+    )
+    report = report_res.scalar_one_or_none()
+    revenue = report.revenue if report else ZERO
+
+    # Загрузить все PayrollEntry за день
+    entries_res = await db.execute(
+        select(PayrollEntry)
+        .options(selectinload(PayrollEntry.employee).selectinload(Employee.position))
+        .where(and_(PayrollEntry.branch_id == branch_id, PayrollEntry.date == work_date))
+    )
+    entries = entries_res.scalars().all()
+
+    # Суммировать по категориям
+    cat_fot: dict[str, Decimal] = {c.value: ZERO for c in PositionCategory}
+    total_fot = ZERO
+    for e in entries:
+        total_fot += e.total_pay
+        if e.employee and e.employee.position:
+            cat = e.employee.position.category.value
+            cat_fot[cat] = cat_fot.get(cat, ZERO) + e.total_pay
+
+    kitchen_fot = cat_fot.get("kitchen", ZERO)
+
+    def safe_pct(num: Decimal, den: Decimal) -> Decimal:
+        return round(num / den * 100, 2) if den else ZERO
+
+    total_pct = safe_pct(total_fot, revenue)
+    kitchen_pct = safe_pct(kitchen_fot, revenue)
+
+    # Удалить старый FotSummary и создать новый
+    await db.execute(
+        delete(FotSummary).where(
+            and_(FotSummary.branch_id == branch_id, FotSummary.date == work_date)
+        )
+    )
+    fs = FotSummary(
+        branch_id=branch_id,
+        date=work_date,
+        daily_report_id=report.id if report else None,
+        revenue=revenue,
+        total_fot=round(total_fot, 2),
+        kitchen_fot=round(kitchen_fot, 2),
+        admin_fot=round(cat_fot.get("admin", ZERO), 2),
+        tech_fot=round(cat_fot.get("tech", ZERO), 2),
+        courier_fot=round(cat_fot.get("courier", ZERO), 2),
+        reserve_fot=round(cat_fot.get("reserve", ZERO), 2),
+        total_fot_pct=total_pct,
+        kitchen_fot_pct=kitchen_pct,
+        status_total=_fot_status_total(total_pct),
+        status_kitchen=_fot_status_kitchen(kitchen_pct),
+    )
+    db.add(fs)
+    await db.flush()
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -396,6 +479,426 @@ async def activate_employee(
     await db.commit()
     await db.refresh(emp)
     return _build_list_item(emp)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Shifts — list, correct, manual close
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/shifts")
+async def list_shifts_admin(
+    from_date: date,
+    to_date: date,
+    branch_id: int | None = None,
+    employee_id: int | None = None,
+    status: str | None = Query(None, pattern="^(open|closed)$"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_accountant),
+):
+    q = (
+        select(Shift)
+        .options(
+            selectinload(Shift.employee).selectinload(Employee.position),
+            selectinload(Shift.branch),
+            selectinload(Shift.payroll_entry),
+        )
+        .where(and_(Shift.date >= from_date, Shift.date <= to_date))
+        .order_by(Shift.date.desc(), Shift.opened_at.desc())
+    )
+    if branch_id:
+        q = q.where(Shift.branch_id == branch_id)
+    if employee_id:
+        q = q.where(Shift.employee_id == employee_id)
+    if status:
+        q = q.where(Shift.status == status)
+    shifts = (await db.execute(q)).scalars().all()
+
+    return [
+        {
+            "id": s.id,
+            "employee_id": s.employee_id,
+            "employee_name": s.employee.full_name if s.employee else "—",
+            "branch_id": s.branch_id,
+            "branch_name": s.branch.name if s.branch else "—",
+            "date": str(s.date),
+            "opened_at": s.opened_at.isoformat() if s.opened_at else None,
+            "closed_at": s.closed_at.isoformat() if s.closed_at else None,
+            "approved_hours": float(s.approved_hours) if s.approved_hours is not None else None,
+            "status": s.status.value,
+            "is_corrected": s.payroll_entry.is_corrected if s.payroll_entry else False,
+            "note": s.note,
+        }
+        for s in shifts
+    ]
+
+
+@router.patch("/shifts/{shift_id}")
+async def correct_shift(
+    shift_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_accountant),
+):
+    """Скорректировать часы или вручную закрыть смену. approved_hours=0 → убрать из расчёта."""
+    approved_hours = Decimal(str(body.get("approved_hours", 0)))
+    note = body.get("note", "")
+
+    # Загрузить смену
+    shift_res = await db.execute(
+        select(Shift)
+        .options(
+            selectinload(Shift.employee).selectinload(Employee.position),
+            selectinload(Shift.employee).selectinload(Employee.rates),
+            selectinload(Shift.payroll_entry),
+        )
+        .where(Shift.id == shift_id)
+    )
+    shift = shift_res.scalar_one_or_none()
+    if not shift:
+        raise HTTPException(404, "Смена не найдена")
+
+    # Обновить смену
+    shift.approved_hours = approved_hours
+    shift.status = ShiftStatus.closed
+    if note:
+        shift.note = note
+    if not shift.closed_at:
+        shift.closed_at = datetime.now(timezone.utc)
+
+    await db.flush()
+
+    # Пересчитать PayrollEntry
+    emp = shift.employee
+    pos = emp.position if emp else None
+    rate_entry = None
+    if emp and emp.rates:
+        applicable = [r for r in emp.rates if r.effective_from <= shift.date]
+        rate_entry = max(applicable, key=lambda r: r.effective_from) if applicable else None
+
+    now = datetime.now(timezone.utc)
+    pe = shift.payroll_entry
+
+    if approved_hours > ZERO and rate_entry and pos:
+        from app.models.position import PaymentType
+        if pos.payment_type == PaymentType.fixed_daily:
+            base_pay = rate_entry.fixed_daily_rate or rate_entry.rate
+        else:
+            base_pay = round((rate_entry.rate / Decimal("60")) * (approved_hours * 60), 2)
+        bonus = pe.bonus if pe else ZERO
+        total_pay = base_pay + bonus
+
+        if pe:
+            pe.approved_hours = approved_hours
+            pe.hours_worked = approved_hours
+            pe.base_pay = base_pay
+            pe.total_pay = total_pay
+            pe.is_corrected = True
+            pe.corrected_by = current_user.id
+            pe.corrected_at = now
+            pe.notes = note or pe.notes
+        else:
+            new_pe = PayrollEntry(
+                employee_id=shift.employee_id,
+                branch_id=shift.branch_id,
+                date=shift.date,
+                shift_id=shift.id,
+                hours_worked=approved_hours,
+                approved_hours=approved_hours,
+                rate=rate_entry.rate,
+                base_pay=base_pay,
+                bonus=ZERO,
+                total_pay=total_pay,
+                payment_type=pos.payment_type.value,
+                is_corrected=True,
+                corrected_by=current_user.id,
+                corrected_at=now,
+                notes=note,
+            )
+            db.add(new_pe)
+    elif pe:
+        # approved_hours == 0 → удалить запись из расчёта
+        pe.approved_hours = ZERO
+        pe.hours_worked = ZERO
+        pe.base_pay = ZERO
+        pe.total_pay = ZERO
+        pe.is_corrected = True
+        pe.corrected_by = current_user.id
+        pe.corrected_at = now
+        pe.notes = note or pe.notes
+
+    await db.flush()
+    await _recalculate_fot_summary(db, shift.branch_id, shift.date)
+    await db.commit()
+
+    return {"ok": True, "shift_id": shift_id, "approved_hours": float(approved_hours)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Monthly report
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/monthly-report")
+async def get_monthly_report(
+    year: int,
+    month: int,
+    branch_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_accountant),
+):
+    from_date = date(year, month, 1)
+    to_date = date(year, month, calendar.monthrange(year, month)[1])
+
+    q = (
+        select(PayrollEntry)
+        .options(
+            selectinload(PayrollEntry.employee).selectinload(Employee.position),
+            selectinload(PayrollEntry.employee).selectinload(Employee.rates),
+        )
+        .where(and_(PayrollEntry.date >= from_date, PayrollEntry.date <= to_date))
+    )
+    if branch_id:
+        q = q.where(PayrollEntry.branch_id == branch_id)
+    entries = (await db.execute(q)).scalars().all()
+
+    # Группировать по сотруднику
+    by_emp: dict[int, list] = {}
+    for e in entries:
+        by_emp.setdefault(e.employee_id, []).append(e)
+
+    rows = []
+    for emp_id, emp_entries in sorted(by_emp.items(), key=lambda x: x[1][0].employee.full_name if x[1][0].employee else ""):
+        emp = emp_entries[0].employee
+        pos = emp.position if emp else None
+        rows.append({
+            "employee_id": emp_id,
+            "employee_name": emp.full_name if emp else "—",
+            "position": pos.name if pos else "—",
+            "category": pos.category.value if pos else "—",
+            "payment_type": emp_entries[0].payment_type,
+            "rate": float(emp_entries[0].rate),
+            "days_worked": len(emp_entries),
+            "total_hours": float(sum(e.approved_hours for e in emp_entries)),
+            "base_pay": float(sum(e.base_pay for e in emp_entries)),
+            "bonus": float(sum(e.bonus for e in emp_entries)),
+            "total_pay": float(sum(e.total_pay for e in emp_entries)),
+            "has_corrections": any(e.is_corrected for e in emp_entries),
+        })
+
+    return {
+        "year": year,
+        "month": month,
+        "branch_id": branch_id,
+        "rows": rows,
+        "total_hours": sum(r["total_hours"] for r in rows),
+        "total_pay": sum(r["total_pay"] for r in rows),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Corrections log
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/corrections-log")
+async def corrections_log(
+    from_date: date,
+    to_date: date,
+    branch_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_accountant),
+):
+    q = (
+        select(PayrollEntry)
+        .options(
+            selectinload(PayrollEntry.employee),
+            selectinload(PayrollEntry.corrected_by_user),
+        )
+        .where(
+            and_(
+                PayrollEntry.is_corrected == True,  # noqa: E712
+                PayrollEntry.date >= from_date,
+                PayrollEntry.date <= to_date,
+            )
+        )
+        .order_by(PayrollEntry.corrected_at.desc())
+    )
+    if branch_id:
+        q = q.where(PayrollEntry.branch_id == branch_id)
+    entries = (await db.execute(q)).scalars().all()
+
+    return [
+        {
+            "id": e.id,
+            "date": str(e.date),
+            "employee_name": e.employee.full_name if e.employee else "—",
+            "approved_hours": float(e.approved_hours),
+            "total_pay": float(e.total_pay),
+            "notes": e.notes,
+            "corrected_by": e.corrected_by_user.username if e.corrected_by_user else "—",
+            "corrected_at": e.corrected_at.isoformat() if e.corrected_at else None,
+        }
+        for e in entries
+    ]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Plan vs Fact
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/plan-vs-fact")
+async def plan_vs_fact(
+    week_start: date,
+    branch_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_manager),
+):
+    week_end = week_start + timedelta(days=6)
+
+    plans_res = await db.execute(
+        select(SchedulePlan)
+        .options(selectinload(SchedulePlan.employee))
+        .where(
+            and_(
+                SchedulePlan.branch_id == branch_id,
+                SchedulePlan.date >= week_start,
+                SchedulePlan.date <= week_end,
+            )
+        )
+    )
+    plans = plans_res.scalars().all()
+
+    shifts_res = await db.execute(
+        select(Shift)
+        .options(selectinload(Shift.employee))
+        .where(
+            and_(
+                Shift.branch_id == branch_id,
+                Shift.date >= week_start,
+                Shift.date <= week_end,
+                Shift.status == ShiftStatus.closed,
+            )
+        )
+    )
+    shifts = shifts_res.scalars().all()
+
+    # Агрегировать по сотруднику
+    by_emp: dict[int, dict] = {}
+    for p in plans:
+        eid = p.employee_id
+        if eid not in by_emp:
+            by_emp[eid] = {"employee_name": p.employee.full_name if p.employee else "—", "planned": ZERO, "actual": ZERO}
+        by_emp[eid]["planned"] += p.planned_hours
+
+    for s in shifts:
+        eid = s.employee_id
+        hours = s.approved_hours or ZERO
+        if eid not in by_emp:
+            by_emp[eid] = {"employee_name": s.employee.full_name if s.employee else "—", "planned": ZERO, "actual": ZERO}
+        by_emp[eid]["actual"] += hours
+
+    rows = sorted(
+        [
+            {
+                "employee_id": eid,
+                "employee_name": d["employee_name"],
+                "planned_hours": float(d["planned"]),
+                "actual_hours": float(d["actual"]),
+                "diff": float(d["actual"] - d["planned"]),
+            }
+            for eid, d in by_emp.items()
+        ],
+        key=lambda r: r["employee_name"],
+    )
+    return {"week_start": str(week_start), "week_end": str(week_end), "branch_id": branch_id, "rows": rows}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Violations — сотрудники с незакрытыми/пропущенными сменами
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/violations")
+async def get_violations(
+    from_date: date,
+    to_date: date,
+    branch_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_accountant),
+):
+    today = date.today()
+
+    # Незакрытые смены (open) за прошлые дни
+    q_open = (
+        select(Shift)
+        .options(selectinload(Shift.employee), selectinload(Shift.branch))
+        .where(
+            and_(
+                Shift.date >= from_date,
+                Shift.date < today,  # не сегодняшние
+                Shift.status == ShiftStatus.open,
+            )
+        )
+    )
+    if branch_id:
+        q_open = q_open.where(Shift.branch_id == branch_id)
+    open_shifts = (await db.execute(q_open)).scalars().all()
+
+    # Ручные закрытия бухгалтером (is_corrected=True за период)
+    q_corr = (
+        select(PayrollEntry)
+        .options(selectinload(PayrollEntry.employee))
+        .where(
+            and_(
+                PayrollEntry.is_corrected == True,  # noqa: E712
+                PayrollEntry.date >= from_date,
+                PayrollEntry.date <= to_date,
+            )
+        )
+    )
+    if branch_id:
+        q_corr = q_corr.where(PayrollEntry.branch_id == branch_id)
+    corrections = (await db.execute(q_corr)).scalars().all()
+
+    # Агрегировать по сотруднику
+    by_emp: dict[int, dict] = {}
+
+    for s in open_shifts:
+        eid = s.employee_id
+        if eid not in by_emp:
+            by_emp[eid] = {
+                "employee_id": eid,
+                "employee_name": s.employee.full_name if s.employee else "—",
+                "branch_name": s.branch.name if s.branch else "—",
+                "unclosed": 0,
+                "manual_closed": 0,
+                "last_incident": str(s.date),
+            }
+        by_emp[eid]["unclosed"] += 1
+        if str(s.date) > by_emp[eid]["last_incident"]:
+            by_emp[eid]["last_incident"] = str(s.date)
+
+    for e in corrections:
+        eid = e.employee_id
+        if eid not in by_emp:
+            by_emp[eid] = {
+                "employee_id": eid,
+                "employee_name": e.employee.full_name if e.employee else "—",
+                "branch_name": "—",
+                "unclosed": 0,
+                "manual_closed": 0,
+                "last_incident": str(e.date),
+            }
+        by_emp[eid]["manual_closed"] += 1
+        if str(e.date) > by_emp[eid]["last_incident"]:
+            by_emp[eid]["last_incident"] = str(e.date)
+
+    rows = sorted(
+        [
+            {**d, "total": d["unclosed"] + d["manual_closed"]}
+            for d in by_emp.values()
+            if d["unclosed"] + d["manual_closed"] > 0
+        ],
+        key=lambda r: -r["total"],
+    )
+    return rows
 
 
 # ══════════════════════════════════════════════════════════════════════════════
