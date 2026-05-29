@@ -19,7 +19,7 @@ class BranchOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-@router.get("/", response_model=list[BranchOut])
+@router.get("", response_model=list[BranchOut])
 async def list_branches(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Branch).where(Branch.is_active == True))
     return result.scalars().all()

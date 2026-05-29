@@ -47,7 +47,7 @@ def _safe_pct(numerator: Decimal, denominator: Decimal) -> Decimal | None:
 
 # ─── Existing endpoint (manager page) ────────────────────────────────────────
 
-@router.get("/", response_model=list[DashboardDay])
+@router.get("", response_model=list[DashboardDay])
 async def get_dashboard(
     from_date: date | None = None,
     to_date: date | None = None,

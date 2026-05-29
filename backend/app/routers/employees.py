@@ -18,7 +18,7 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
-@router.get("/", response_model=list[EmployeeOut])
+@router.get("", response_model=list[EmployeeOut])
 async def list_employees(
     branch_id: int | None = None,
     db: AsyncSession = Depends(get_db),
@@ -31,7 +31,7 @@ async def list_employees(
     return result.scalars().all()
 
 
-@router.post("/", response_model=EmployeeOut)
+@router.post("", response_model=EmployeeOut)
 async def create_employee(
     body: EmployeeCreate,
     db: AsyncSession = Depends(get_db),

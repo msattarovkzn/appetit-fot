@@ -130,7 +130,7 @@ async def close_shift(body: ShiftCloseRequest, db: AsyncSession = Depends(get_db
     return out
 
 
-@router.get("/", response_model=list[ShiftOut])
+@router.get("", response_model=list[ShiftOut])
 async def list_shifts(
     branch_id: int,
     shift_date: date | None = None,
