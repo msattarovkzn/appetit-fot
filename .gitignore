@@ -1,0 +1,63 @@
+# Секреты — никогда не в репо
+.env
+.env.*
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.log
+
+# Docker volumes
+postgres_data/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Git worktrees
+.worktrees/
+
+# Другие проекты в этой папке (не appetit-fot)
+Аппетит/
+appetit-game-v2/
+Игра «Помоги курьеру довезти заказ»/
+Ленгинг на подписку МAX/
+Лендинг Аппетит/
+Лендинг Аппетит ЧЛБ/
+Психолог/
+Сайт для ресниц/
+max-review-bot/
+sushi-bot/
+social-popup-widget/
+social-popup-widget-chelyabinsk/
+social-popup-widget.zip
+social-popup-widget-chelyabinsk.zip
+audit_ikcontinent.pptx
+audit_pptx*.py
+audit_pptx*.js
+run_audit.bat
+MEMORY.md
+CLAUDE.md
+skills/
+package.json
+package-lock.json

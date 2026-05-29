@@ -85,7 +85,7 @@ export const api = {
     if (params.branch_id) p.append('branch_id', String(params.branch_id))
     return request<Array<{
       date: string; branch_id: number; branch_name: string;
-      revenue: number | null;
+      revenue: number | null; orders_count: number | null;
       total_fot: number | null; kitchen_fot: number | null;
       total_fot_pct: number | null; kitchen_fot_pct: number | null;
       status_total: string | null; status_kitchen: string | null;
