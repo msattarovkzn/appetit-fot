@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, branches, employees, shifts, cashier, payroll, dashboard, test_mode, schedule, admin
 
-app = FastAPI(title="Аппетит ФОТ API", version="1.0.0")
+app = FastAPI(title="Аппетит ФОТ API", version="1.0.0", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
