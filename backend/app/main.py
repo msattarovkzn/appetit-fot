@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, branches, employees, shifts, cashier, payroll, dashboard, test_mode, schedule, admin
+from app.routers import auth, branches, employees, shifts, cashier, payroll, dashboard, test_mode, schedule, admin, review
 
 app = FastAPI(title="Аппетит ФОТ API", version="1.0.0", redirect_slashes=False)
 
@@ -23,6 +23,7 @@ app.include_router(dashboard.router)
 app.include_router(test_mode.router)
 app.include_router(schedule.router)
 app.include_router(admin.router)
+app.include_router(review.router)
 
 
 @app.get("/health")

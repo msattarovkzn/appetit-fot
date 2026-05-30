@@ -628,6 +628,23 @@ async def correct_shift(
 
     await db.flush()
     await _recalculate_fot_summary(db, shift.branch_id, shift.date)
+
+    # Журнал аудита + пересчёт статуса дня
+    from app.utils.review_helpers import write_audit, compute_and_save_review
+    await write_audit(
+        db,
+        entity_type="shift",
+        entity_id=shift_id,
+        action="correct",
+        user=current_user,
+        branch_id=shift.branch_id,
+        work_date=shift.date,
+        old_value={"approved_hours": float(shift.approved_hours or 0)},
+        new_value={"approved_hours": float(approved_hours)},
+        comment=note,
+    )
+    await compute_and_save_review(db, shift.branch_id, shift.date)
+
     await db.commit()
 
     return {"ok": True, "shift_id": shift_id, "approved_hours": float(approved_hours)}

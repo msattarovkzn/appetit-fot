@@ -28,5 +28,4 @@ class User(Base):
 
     branch: Mapped["Branch | None"] = relationship(back_populates="users")
     closed_reports: Mapped[list["BranchDailyReport"]] = relationship(back_populates="closed_by_user")
-    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user")
     corrected_entries: Mapped[list["PayrollEntry"]] = relationship(back_populates="corrected_by_user")

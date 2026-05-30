@@ -410,5 +410,63 @@ export const api = {
       unclosed: number; manual_closed: number; total: number; last_incident: string
     }>>(`/admin/violations?${p}`)
   },
+
+  // ── Review: статусы филиалов (Блок 3) ────────────────────────────────────
+  reviewList: (review_date?: string) => {
+    const p = review_date ? `?review_date=${review_date}` : ''
+    return request<{
+      date: string
+      branches: Array<{
+        branch_id: number; branch_name: string; date: string
+        status: string; emoji: string
+        issues_count: number; issues: string[]; issues_labels: string[]
+        reviewed_by: string | null; reviewed_at: string | null
+      }>
+    }>(`/review${p}`)
+  },
+
+  reviewDetail: (branch_id: number, review_date: string) =>
+    request<{
+      branch_id: number; date: string
+      status: string; emoji: string
+      issues_count: number; issues: string[]; issues_labels: string[]
+      reviewed_by: number | null; reviewed_at: string | null; notes: string | null
+      shifts: Array<{
+        id: number; employee_name: string; status: string
+        opened_at: string | null; closed_at: string | null; hours: number | null
+        anomaly_flag: string | null; anomaly_resolved: boolean
+        is_extra_shift: boolean; extra_shift_reason: string | null
+        is_corrected: boolean; note: string | null
+      }>
+    }>(`/review/${branch_id}/${review_date}`),
+
+  reviewVerify: (branch_id: number, review_date: string, notes?: string) =>
+    request<{ ok: boolean; status: string; reviewed_by: string; reviewed_at: string }>(
+      `/review/${branch_id}/${review_date}/verify`,
+      { method: 'POST', body: JSON.stringify({ notes: notes ?? null }) }
+    ),
+
+  reviewReopen: (branch_id: number, review_date: string) =>
+    request<{ ok: boolean; status: string }>(
+      `/review/${branch_id}/${review_date}/reopen`,
+      { method: 'POST', body: JSON.stringify({}) }
+    ),
+
+  reviewResolveAnomaly: (shift_id: number, approved_hours?: number, comment?: string) =>
+    request<{ ok: boolean; shift_id: number; resolved_by: string }>(
+      `/review/shifts/${shift_id}/resolve`,
+      { method: 'POST', body: JSON.stringify({ approved_hours: approved_hours ?? null, comment: comment ?? null }) }
+    ),
+
+  reviewAuditLog: (params: { from_date: string; to_date: string; branch_id?: number; entity_type?: string }) => {
+    const p = new URLSearchParams({ from_date: params.from_date, to_date: params.to_date })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    if (params.entity_type) p.append('entity_type', params.entity_type)
+    return request<Array<{
+      id: number; entity_type: string; entity_id: number | null; action: string
+      user_name: string | null; branch_id: number | null; work_date: string | null
+      old_value: any; new_value: any; comment: string | null; created_at: string
+    }>>(`/review/audit-log?${p}`)
+  },
   // ─────────────────────────────────────────────────────────────────────────
 }
