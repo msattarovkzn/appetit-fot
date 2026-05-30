@@ -10,6 +10,7 @@ from .notification import Notification
 from .audit import AuditLog
 from .schedule import SchedulePlan
 from .review import DailyBranchReview
+from .cashier_session import CashierSession
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "AuditLog",
     "SchedulePlan",
     "DailyBranchReview",
+    "CashierSession",
 ]
