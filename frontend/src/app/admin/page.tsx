@@ -228,6 +228,14 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400">🔴🟡🟢 Статусы, аномалии, закрытие</p>
           </div>
         </a>
+        <a href="/analytics"
+          className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-brand/30 transition-all">
+          <span className="text-2xl">📈</span>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">Аналитика</p>
+            <p className="text-xs text-gray-400">Тренды, сравнения, прогноз месяца</p>
+          </div>
+        </a>
       </div>
 
       {/* Фильтры */}

@@ -511,5 +511,52 @@ export const api = {
       bonus_amount: number; closed_at: string | null
     }>>(`/cashier/sessions?${p}`)
   },
+  // ── Analytics (Блок 8) ───────────────────────────────────────────────────
+  analyticsOverview: (params: { from_date: string; to_date: string; branch_id?: number }) => {
+    const p = new URLSearchParams({ from_date: params.from_date, to_date: params.to_date })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    return request<{
+      period: { from_date: string; to_date: string; days: number }
+      totals: {
+        revenue: number; orders: number; takeaways: number
+        avg_revenue_per_day: number; avg_orders_per_day: number; avg_check: number | null
+        total_fot: number; kitchen_fot: number
+        total_fot_pct: number | null; kitchen_fot_pct: number | null
+      }
+      vs_prev_period: {
+        revenue_diff_pct: number | null; revenue_diff_abs: number | null
+        avg_check_diff_pct: number | null; orders_diff_pct: number | null
+        prev_revenue: number; prev_orders: number; prev_avg_check: number | null
+      }
+      trend: Array<{
+        date: string; weekday: string
+        revenue: number; orders: number; takeaways: number; avg_check: number | null
+        total_fot: number; kitchen_fot: number
+        total_fot_pct: number | null; kitchen_fot_pct: number | null
+      }>
+      weekday_stats: Array<{ weekday: string; avg_revenue: number; samples: number }>
+      best_weekday: string | null; worst_weekday: string | null
+      branch_stats: Array<{
+        branch_id: number; branch_name: string
+        revenue: number; orders: number; days: number; avg_revenue: number
+      }>
+      best_branch: any; worst_branch: any
+      month_forecast: {
+        month_revenue_so_far: number; days_elapsed: number; days_in_month: number
+        projected_month_revenue: number | null
+      }
+    }>(`/analytics/overview?${p}`)
+  },
+
+  analyticsCompare: (params: { period: string; branch_id?: number }) => {
+    const p = new URLSearchParams({ period: params.period })
+    if (params.branch_id) p.append('branch_id', String(params.branch_id))
+    return request<{
+      period: string
+      current: { from: string; to: string; revenue: number; orders: number; avg_check: number | null; avg_revenue: number | null; days: number }
+      previous: { from: string; to: string; revenue: number; orders: number; avg_check: number | null; avg_revenue: number | null; days: number }
+      diff: { revenue_abs: number | null; revenue_pct: number | null; orders_pct: number | null; avg_check_pct: number | null }
+    }>(`/analytics/compare?${p}`)
+  },
   // ─────────────────────────────────────────────────────────────────────────
 }
