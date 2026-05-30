@@ -220,6 +220,14 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400">ФОТ по сотрудникам, экспорт Excel</p>
           </div>
         </a>
+        <a href="/admin/review"
+          className="flex items-center gap-3 p-4 bg-white rounded-xl border border-red-100 shadow-sm hover:shadow-md hover:border-brand/30 transition-all">
+          <span className="text-2xl">✅</span>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">Проверка дней</p>
+            <p className="text-xs text-gray-400">🔴🟡🟢 Статусы, аномалии, закрытие</p>
+          </div>
+        </a>
       </div>
 
       {/* Фильтры */}

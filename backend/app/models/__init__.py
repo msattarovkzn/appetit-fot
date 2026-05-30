@@ -9,6 +9,7 @@ from .payroll import PayrollEntry, FotSummary
 from .notification import Notification
 from .audit import AuditLog
 from .schedule import SchedulePlan
+from .review import DailyBranchReview
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "Notification",
     "AuditLog",
     "SchedulePlan",
+    "DailyBranchReview",
 ]
