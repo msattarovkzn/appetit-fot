@@ -20,6 +20,9 @@ class Employee(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Phase 2: employee self-service login
+    employee_login: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("pin_check", "branch_id", name="uq_employee_pin_branch"),

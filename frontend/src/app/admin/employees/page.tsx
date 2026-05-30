@@ -93,6 +93,7 @@ function EmployeeFormModal({
   const [positionId, setPositionId] = useState<number>(initial?.position_id ?? (positions[0]?.id ?? 0))
   const [isCashier, setIsCashier] = useState(initial?.is_cashier ?? false)
   const [comment, setComment] = useState(initial?.comment ?? '')
+  const [employeeLogin, setEmployeeLogin] = useState((initial as any)?.employee_login ?? '')
   const [rate, setRate] = useState('')
   const [fixedDaily, setFixedDaily] = useState('')
   const [effectiveFrom, setEffectiveFrom] = useState(todayStr())
@@ -112,7 +113,7 @@ function EmployeeFormModal({
     setSaving(true)
     try {
       if (isEdit) {
-        const data: Record<string, unknown> = { full_name: fullName, position_id: positionId, is_cashier: isCashier, comment }
+        const data: Record<string, unknown> = { full_name: fullName, position_id: positionId, is_cashier: isCashier, comment, employee_login: employeeLogin || null }
         if (pin) data.pin = pin
         await api.adminUpdateEmployee(initial!.id, data)
       } else {
@@ -193,6 +194,13 @@ function EmployeeFormModal({
             </div>
           </div>
         )}
+
+        <Field label="Логин для кабинета сотрудника">
+          <input className={inputCls} type="text" value={employeeLogin}
+            onChange={e => setEmployeeLogin(e.target.value)}
+            placeholder="Например: ivanov (латиница/кириллица)" />
+          <p className="text-xs text-gray-400 mt-1">Сотрудник входит на appetit-fot.vercel.app/employee по этому логину + PIN</p>
+        </Field>
 
         <Field label="Комментарий">
           <textarea className={inputCls + ' resize-none'} rows={2} value={comment}

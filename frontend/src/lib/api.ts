@@ -300,7 +300,7 @@ export const api = {
 
   adminUpdateEmployee: (id: number, data: {
     full_name?: string; pin?: string; position_id?: number
-    is_cashier?: boolean; comment?: string
+    is_cashier?: boolean; comment?: string; employee_login?: string | null
   }) =>
     request<{ id: number; full_name: string }>(`/admin/employees/${id}`, {
       method: 'PUT', body: JSON.stringify(data),
@@ -557,6 +557,60 @@ export const api = {
       previous: { from: string; to: string; revenue: number; orders: number; avg_check: number | null; avg_revenue: number | null; days: number }
       diff: { revenue_abs: number | null; revenue_pct: number | null; orders_pct: number | null; avg_check_pct: number | null }
     }>(`/analytics/compare?${p}`)
+  },
+  // ── Employee cabinet (Блок 9) ─────────────────────────────────────────────
+  employeeLogin: (login: string, pin: string) =>
+    request<{
+      access_token: string; employee_id: number; full_name: string
+      position: string; branch: string; rate: number | null; payment_type: string | null
+    }>('/employee/login', { method: 'POST', body: JSON.stringify({ login, pin }) }),
+
+  employeeProfile: (token: string) =>
+    fetch(`${BASE}/employee/me`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({ detail: 'Ошибка' })); throw new Error(e.detail) }
+      return r.json() as Promise<{
+        id: number; full_name: string; position: string; category: string
+        payment_type: string; branch: string; is_cashier: boolean
+        rate: number | null; fixed_daily_rate: number | null; rate_since: string | null
+      }>
+    }),
+
+  employeePayroll: (token: string, year: number, month: number) =>
+    fetch(`${BASE}/employee/me/payroll?year=${year}&month=${month}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({ detail: 'Ошибка' })); throw new Error(e.detail) }
+      return r.json() as Promise<{
+        year: number; month: number; days_worked: number; total_hours: number; total_pay: number
+        projected_pay: number | null; days_elapsed: number; days_in_month: number
+        entries: Array<{ date: string; hours: number; base_pay: number; bonus: number; total_pay: number; is_corrected: boolean }>
+      }>
+    }),
+
+  employeeShifts: (token: string, year: number, month: number) =>
+    fetch(`${BASE}/employee/me/shifts?year=${year}&month=${month}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({ detail: 'Ошибка' })); throw new Error(e.detail) }
+      return r.json() as Promise<{
+        year: number; month: number
+        shifts: Array<{ id: number; date: string; status: string; is_extra_shift: boolean; opened_at: string | null; closed_at: string | null; hours: number | null; total_pay: number | null; is_corrected: boolean; anomaly_flag: string | null; note: string | null }>
+      }>
+    }),
+
+  employeeSchedule: (token: string, week_start?: string) => {
+    const qs = week_start ? `?week_start=${week_start}` : ''
+    return fetch(`${BASE}/employee/me/schedule${qs}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({ detail: 'Ошибка' })); throw new Error(e.detail) }
+      return r.json() as Promise<{
+        week_start: string; week_end: string; employee_name: string
+        days: Array<{ date: string; weekday: string; is_today: boolean; is_past: boolean; plan_hours: number | null; plan_start: string | null; plan_end: string | null; actual_hours: number | null; has_open_shift: boolean; shifts_count: number }>
+      }>
+    })
   },
   // ─────────────────────────────────────────────────────────────────────────
 }
