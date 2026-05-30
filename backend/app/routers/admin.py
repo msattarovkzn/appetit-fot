@@ -430,6 +430,10 @@ async def update_employee(
     if body.comment is not None:
         emp.comment = body.comment
 
+    # employee_login — для кабинета сотрудника
+    if body.employee_login is not None:
+        emp.employee_login = body.employee_login.strip() or None
+
     await db.commit()
 
     res = await db.execute(

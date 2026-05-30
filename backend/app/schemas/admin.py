@@ -97,6 +97,7 @@ class EmployeeUpdate(BaseModel):
     position_id: Optional[int] = None
     is_cashier: Optional[bool] = None
     comment: Optional[str] = None
+    employee_login: Optional[str] = None  # логин для кабинета сотрудника
 
     @field_validator("pin")
     @classmethod
