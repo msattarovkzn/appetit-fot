@@ -468,5 +468,30 @@ export const api = {
       old_value: any; new_value: any; comment: string | null; created_at: string
     }>>(`/review/audit-log?${p}`)
   },
+  // ── Cashier: extra shifts + sessions (Блок 1, 2) ─────────────────────────
+  cashierOpenExtraShift: (data: {
+    pin: string; branch_id: number; employee_id: number
+    start_time?: string; reason?: string
+  }) =>
+    request<{ ok: boolean; shift_id: number; employee_name: string; opened_at: string; opened_by: string }>(
+      '/cashier/extra-shift/open',
+      { method: 'POST', body: JSON.stringify(data) }
+    ),
+
+  cashierCloseExtraShift: (data: { pin: string; branch_id: number; shift_id: number }) =>
+    request<{ ok: boolean; shift_id: number; employee_name: string; approved_hours: number; closed_by: string }>(
+      '/cashier/extra-shift/close',
+      { method: 'POST', body: JSON.stringify(data) }
+    ),
+
+  cashierSessions: (branch_id: number, session_date: string) => {
+    const p = new URLSearchParams({ branch_id: String(branch_id), session_date })
+    return request<Array<{
+      id: number; cashier_name: string
+      shift_start: string | null; shift_end: string | null
+      revenue: number; orders_count: number; takeaway_count: number
+      bonus_amount: number; closed_at: string | null
+    }>>(`/cashier/sessions?${p}`)
+  },
   // ─────────────────────────────────────────────────────────────────────────
 }

@@ -134,6 +134,62 @@ export default function CashierPage() {
 
   const hasWarning = successMsg.includes('⚠️')
 
+  // ── Доп. смена ────────────────────────────────────────────────────────────
+  const [extraMode, setExtraMode] = useState<'hidden' | 'open_form' | 'close_form'>('hidden')
+  const [employees, setEmployees] = useState<Array<{id: number; full_name: string; position: {name: string} | null}>>([])
+  const [extraEmployeeId, setExtraEmployeeId] = useState('')
+  const [extraStartTime, setExtraStartTime] = useState('')
+  const [extraReason, setExtraReason] = useState('')
+  const [extraShiftId, setExtraShiftId] = useState<number | null>(null)
+  const [extraEmployeeName, setExtraEmployeeName] = useState('')
+  const [extraLoading, setExtraLoading] = useState(false)
+  const [extraError, setExtraError] = useState('')
+
+  const loadEmployees = async () => {
+    if (!branch) return
+    try {
+      const list = await api.getEmployees(branch.id)
+      setEmployees(list.filter((e: any) => e.is_active))
+    } catch {}
+  }
+
+  const handleOpenExtraShift = async () => {
+    if (!extraEmployeeId || !branch) return
+    setExtraLoading(true)
+    setExtraError('')
+    try {
+      const res = await api.cashierOpenExtraShift({
+        pin: currentPin,
+        branch_id: branch.id,
+        employee_id: parseInt(extraEmployeeId),
+        start_time: extraStartTime || undefined,
+        reason: extraReason || 'Дополнительная смена',
+      })
+      setExtraShiftId(res.shift_id)
+      setExtraEmployeeName(res.employee_name)
+      setExtraMode('close_form')
+      setExtraReason('')
+      setExtraStartTime('')
+    } catch (e: any) { setExtraError(e.message) } finally { setExtraLoading(false) }
+  }
+
+  const handleCloseExtraShift = async () => {
+    if (!extraShiftId || !branch) return
+    setExtraLoading(true)
+    setExtraError('')
+    try {
+      await api.cashierCloseExtraShift({
+        pin: currentPin,
+        branch_id: branch.id,
+        shift_id: extraShiftId,
+      })
+      setExtraMode('hidden')
+      setExtraShiftId(null)
+      setExtraEmployeeName('')
+      setExtraEmployeeId('')
+    } catch (e: any) { setExtraError(e.message) } finally { setExtraLoading(false) }
+  }
+
   return (
     <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-6 bg-gray-50">
       <h1 className="text-2xl font-bold text-brand">Аппетит — Кассир</h1>
@@ -235,6 +291,86 @@ export default function CashierPage() {
           <button onClick={backToPin} className="text-sm text-gray-400 hover:text-gray-600">
             ← Ввести PIN снова
           </button>
+
+          {/* ── Доп. смена ── */}
+          <div className="w-full border-t pt-4">
+            {extraMode === 'hidden' && (
+              <button
+                onClick={() => { setExtraMode('open_form'); setExtraError(''); loadEmployees() }}
+                className="w-full py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-medium">
+                ➕ Открыть доп. смену сотруднику
+              </button>
+            )}
+
+            {extraMode === 'open_form' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col gap-3">
+                <p className="font-semibold text-sm text-blue-800">➕ Дополнительная смена</p>
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-gray-600 font-medium">Сотрудник</span>
+                  <select value={extraEmployeeId} onChange={e => setExtraEmployeeId(e.target.value)}
+                    className="border rounded-lg px-3 py-2 bg-white">
+                    <option value="">— выберите —</option>
+                    {employees.map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.full_name}{e.position ? ` (${e.position.name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-gray-600 font-medium">Время начала (необязательно)</span>
+                  <input type="time" value={extraStartTime}
+                    onChange={e => setExtraStartTime(e.target.value)}
+                    className="border rounded-lg px-3 py-2 bg-white" />
+                  <span className="text-xs text-gray-400">Оставьте пустым — запишется сейчас</span>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-gray-600 font-medium">Причина</span>
+                  <input type="text" value={extraReason}
+                    onChange={e => setExtraReason(e.target.value)}
+                    placeholder="Дополнительная смена"
+                    className="border rounded-lg px-3 py-2 bg-white" />
+                </label>
+
+                {extraError && <p className="text-red-500 text-xs">{extraError}</p>}
+
+                <div className="flex gap-2">
+                  <button onClick={() => setExtraMode('hidden')}
+                    className="flex-1 py-2 border rounded-lg text-gray-500 text-sm hover:bg-gray-50">
+                    Отмена
+                  </button>
+                  <button onClick={handleOpenExtraShift}
+                    disabled={extraLoading || !extraEmployeeId}
+                    className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-700">
+                    {extraLoading ? '...' : 'Открыть'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {extraMode === 'close_form' && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col gap-3">
+                <p className="font-semibold text-sm text-green-800">
+                  ✅ Доп. смена открыта: {extraEmployeeName}
+                </p>
+                <p className="text-xs text-gray-500">Когда сотрудник закончит — закройте смену</p>
+                {extraError && <p className="text-red-500 text-xs">{extraError}</p>}
+                <div className="flex gap-2">
+                  <button onClick={() => { setExtraMode('open_form'); loadEmployees() }}
+                    className="flex-1 py-2 border rounded-lg text-gray-500 text-sm hover:bg-gray-50">
+                    Ещё одну
+                  </button>
+                  <button onClick={handleCloseExtraShift} disabled={extraLoading}
+                    className="flex-1 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-gray-800">
+                    {extraLoading ? '...' : '🔒 Закрыть смену'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

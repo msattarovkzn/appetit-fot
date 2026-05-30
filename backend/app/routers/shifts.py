@@ -63,17 +63,27 @@ async def open_shift(body: ShiftOpenRequest, db: AsyncSession = Depends(get_db))
     emp = await _find_employee_by_pin(db, body.pin, body.branch_id)
 
     today = datetime.now(timezone.utc).date()
-    existing = await db.execute(
+
+    # Уже есть открытая смена?
+    open_res = await db.execute(
         select(Shift).where(
-            and_(
-                Shift.employee_id == emp.id,
-                Shift.date == today,
-                Shift.status == ShiftStatus.open,
-            )
+            and_(Shift.employee_id == emp.id, Shift.date == today, Shift.status == ShiftStatus.open)
         )
     )
-    if existing.scalar_one_or_none():
+    if open_res.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Смена уже открыта")
+
+    # Уже была закрытая смена сегодня? → доп. смену открывает только кассир
+    closed_res = await db.execute(
+        select(Shift).where(
+            and_(Shift.employee_id == emp.id, Shift.date == today, Shift.status == ShiftStatus.closed)
+        )
+    )
+    if closed_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="already_had_shift"
+        )
 
     shift = Shift(
         employee_id=emp.id,

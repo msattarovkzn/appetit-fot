@@ -104,7 +104,14 @@ export default function ShiftPage() {
       }
       setMode('success')
     } catch (e: any) {
-      setActionError(e.message || 'Ошибка')
+      const msg = e.message || 'Ошибка'
+      if (msg === 'already_had_shift') {
+        setActionError(
+          'У вас уже была смена сегодня.\nДополнительную смену может открыть только кассир.'
+        )
+      } else {
+        setActionError(msg)
+      }
     } finally {
       setLoading(false)
     }
