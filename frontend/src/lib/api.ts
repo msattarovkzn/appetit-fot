@@ -430,15 +430,33 @@ export const api = {
       branch_id: number; date: string
       status: string; emoji: string
       issues_count: number; issues: string[]; issues_labels: string[]
-      reviewed_by: number | null; reviewed_at: string | null; notes: string | null
+      reviewed_by: string | null; reviewed_at: string | null; notes: string | null
+      daily_report: { revenue: number | null; orders_count: number | null; takeaway_count: number | null; avg_check: number | null }
+      fot: { total_fot: number | null; kitchen_fot: number | null; total_fot_pct: number | null; kitchen_fot_pct: number | null; status_total: string | null; status_kitchen: string | null }
+      plan_fact: { plan_hours: number; fact_hours: number; plan_fot: number; fact_fot: number | null }
+      verdict: string
       shifts: Array<{
-        id: number; employee_name: string; status: string
+        id: number; employee_id: number; employee_name: string
+        position_name: string; category: string; payment_type: string; comment: string | null
+        status: string; is_extra_shift: boolean; extra_shift_reason: string | null
         opened_at: string | null; closed_at: string | null; hours: number | null
         anomaly_flag: string | null; anomaly_resolved: boolean
-        is_extra_shift: boolean; extra_shift_reason: string | null
-        is_corrected: boolean; note: string | null
+        is_corrected: boolean; is_annulled: boolean; note: string | null
+        rate: number | null; fixed_daily_rate: number | null
+        approved_hours: number | null; base_pay: number | null; bonus: number; total_pay: number | null
+        plan_hours: number | null; plan_start: string | null; plan_end: string | null
       }>
     }>(`/review/${branch_id}/${review_date}`),
+
+  reviewCorrectShift: (shift_id: number, body: {
+    opened_at?: string; closed_at?: string
+    approved_hours?: number; rate_override?: number
+    annul?: boolean; note?: string
+  }) =>
+    request<{ ok: boolean; shift_id: number; approved_hours: number | null; total_pay: number; annulled: boolean }>(
+      `/review/shifts/${shift_id}/correct`,
+      { method: 'PATCH', body: JSON.stringify(body) }
+    ),
 
   reviewVerify: (branch_id: number, review_date: string, notes?: string) =>
     request<{ ok: boolean; status: string; reviewed_by: string; reviewed_at: string }>(
