@@ -246,6 +246,15 @@ async def close_day_by_pin(
     emp = await _find_cashier_by_pin(db, body.pin, body.branch_id)
 
     # 2. Проверить что этот кассир уже не закрывал сегодня
+    existing_session = await db.execute(
+        select(CashierSession).where(
+            and_(
+                CashierSession.branch_id == body.branch_id,
+                CashierSession.date == body.date,
+                CashierSession.cashier_employee_id == emp.id,
+            )
+        )
+    )
     if existing_session.scalar_one_or_none():
         raise HTTPException(400, "Вы уже закрыли свою кассирскую смену сегодня")
 
