@@ -81,8 +81,15 @@ export default function ManagerPage() {
     <main className="p-4 max-w-6xl mx-auto">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6 mt-4">
         <h1 className="text-2xl font-bold text-brand">Дашборд управляющего</h1>
-        <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
-          className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        <div className="flex items-center gap-3">
+          <a href="/live"
+            className="flex items-center gap-1.5 text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 font-medium">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block" />
+            Кто сейчас на смене
+          </a>
+          <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
+            className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        </div>
       </div>
 
       {/* Фильтр периода */}

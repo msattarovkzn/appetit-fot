@@ -473,7 +473,15 @@ export default function SchedulePage() {
         setEdits(editsFromData(data))
         setDirty(false)
       })
-      .catch(e => setLoadError(e.message || 'Ошибка загрузки'))
+      .catch(e => {
+        const msg = e.message || 'Ошибка загрузки'
+        if (msg === 'Invalid token' || msg === 'Not authenticated') {
+          localStorage.removeItem('token'); localStorage.removeItem('role')
+          setToken(null); setRole('')
+        } else {
+          setLoadError(msg)
+        }
+      })
       .finally(() => setLoading(false))
   }, [token, branchId, weekStart])
 

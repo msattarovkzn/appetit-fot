@@ -228,6 +228,14 @@ export default function AdminPage() {
             <p className="text-xs text-gray-400">🔴🟡🟢 Статусы, аномалии, закрытие</p>
           </div>
         </a>
+        <a href="/live"
+          className="flex items-center gap-3 p-4 bg-white rounded-xl border border-green-100 shadow-sm hover:shadow-md hover:border-green-300 transition-all">
+          <span className="text-2xl flex items-center gap-1">🟢</span>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">Live — кто на смене</p>
+            <p className="text-xs text-gray-400">Все филиалы в реальном времени</p>
+          </div>
+        </a>
         <a href="/analytics"
           className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-brand/30 transition-all">
           <span className="text-2xl">📈</span>

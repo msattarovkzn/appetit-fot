@@ -1,4 +1,4 @@
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.employee import Employee
 from app.models.shift import Shift, ShiftStatus
+from app.models.branch import Branch
 from app.models.user import User
 from app.dependencies import require_manager
 from app.schemas.shift import ShiftOpenRequest, ShiftCloseRequest, ShiftOut, ShiftApproveRequest, ShiftStatusRequest, ShiftStatusResponse
@@ -166,6 +167,81 @@ async def list_shifts(
         item.employee_name = s.employee.full_name
         out.append(item)
     return out
+
+
+@router.get("/live")
+async def live_shifts(
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Все ОТКРЫТЫЕ смены прямо сейчас — по всем филиалам.
+    Публичный endpoint (без авторизации) для экрана мониторинга.
+    """
+    today = datetime.now(timezone.utc).date()
+
+    result = await db.execute(
+        select(Shift)
+        .options(
+            selectinload(Shift.employee).selectinload(Employee.position),
+            selectinload(Shift.branch),
+        )
+        .where(
+            and_(
+                Shift.status == ShiftStatus.open,
+                Shift.date == today,
+            )
+        )
+        .order_by(Shift.branch_id, Shift.opened_at)
+    )
+    shifts = result.scalars().all()
+
+    now = datetime.now(timezone.utc)
+
+    # Группируем по филиалу
+    by_branch: dict[int, dict] = {}
+    for s in shifts:
+        bid = s.branch_id
+        if bid not in by_branch:
+            by_branch[bid] = {
+                "branch_id": bid,
+                "branch_name": s.branch.name if s.branch else f"#{bid}",
+                "shifts": [],
+            }
+        opened = s.opened_at
+        if opened and opened.tzinfo is None:
+            opened = opened.replace(tzinfo=timezone.utc)
+        minutes_on = int((now - opened).total_seconds() / 60) if opened else None
+        by_branch[bid]["shifts"].append({
+            "id": s.id,
+            "employee_name": s.employee.full_name if s.employee else "—",
+            "position": s.employee.position.name if s.employee and s.employee.position else "—",
+            "category": s.employee.position.category.value if s.employee and s.employee.position else "—",
+            "is_extra_shift": s.is_extra_shift,
+            "opened_at": s.opened_at.isoformat() if s.opened_at else None,
+            "minutes_on": minutes_on,
+        })
+
+    # Все филиалы (в т.ч. без смен)
+    branches_res = await db.execute(
+        select(Branch).where(Branch.is_active == True).order_by(Branch.name)  # noqa: E712
+    )
+    all_branches = branches_res.scalars().all()
+
+    result_list = []
+    for b in all_branches:
+        entry = by_branch.get(b.id, {
+            "branch_id": b.id,
+            "branch_name": b.name,
+            "shifts": [],
+        })
+        entry["active_count"] = len(entry["shifts"])
+        result_list.append(entry)
+
+    return {
+        "as_of": now.isoformat(),
+        "branches": result_list,
+        "total_on_shift": sum(len(by_branch.get(b.id, {}).get("shifts", [])) for b in all_branches),
+    }
 
 
 @router.patch("/{shift_id}/approve", response_model=ShiftOut)
