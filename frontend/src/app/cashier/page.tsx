@@ -77,7 +77,14 @@ export default function CashierPage() {
       setSuccessMsg(`${res.employee_name}, ваша смена открыта. Хорошей работы!`)
       setMode('success')
     } catch (e: any) {
-      setActionError(e.message || 'Ошибка')
+      const msg = e.message || 'Ошибка'
+      if (msg === 'already_had_shift') {
+        setActionError(
+          'Смена уже была сегодня.\nМожно сразу закрывать день — нажмите «Закрыть смену и день» ниже.\nЕсли нужна ещё одна смена — используйте «Открыть доп. смену».'
+        )
+      } else {
+        setActionError(msg)
+      }
     } finally {
       setLoading(false)
     }
@@ -288,13 +295,22 @@ export default function CashierPage() {
               <p className="text-gray-400 text-sm mb-5">Смена ещё не открыта</p>
             )}
 
-            {actionError && <p className="text-red-500 text-sm mb-3">{actionError}</p>}
+            {actionError && (
+              <p className="text-red-500 text-sm mb-3 whitespace-pre-line">{actionError}</p>
+            )}
 
             {cashierStatus.has_open_shift ? (
               <button
                 onClick={() => { setFormError(''); setMode('close_form') }}
                 className="w-full py-4 bg-gray-700 text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors">
                 🔒 Закрыть смену и день
+              </button>
+            ) : actionError ? (
+              // Уже была смена сегодня — можно сразу закрыть день с выручкой
+              <button
+                onClick={() => { setFormError(''); setActionError(''); setMode('close_form') }}
+                className="w-full py-4 bg-gray-700 text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors">
+                🔒 Закрыть день (внести выручку)
               </button>
             ) : (
               <button
