@@ -5,7 +5,12 @@ import { api } from '@/lib/api'
 
 // Тестовый режим: только development + только Челябинск (branch_id=1)
 const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true'
+// LIVE_TEST_MODE отключает тестовый UI → реальное время
+const IS_LIVE_TEST = process.env.NEXT_PUBLIC_LIVE_TEST_MODE === 'true'
 const TEST_BRANCH_ID = 1
+
+// Временная зона Челябинска / Екатеринбурга (UTC+5)
+const TZ = 'Asia/Yekaterinburg'
 
 type Mode = 'select_branch' | 'enter_pin' | 'confirm_action' | 'success'
 
@@ -27,8 +32,19 @@ function todayStr() {
 function formatTime(iso: string | null): string {
   if (!iso) return ''
   try {
-    return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    return new Date(iso).toLocaleTimeString('ru-RU', {
+      hour: '2-digit', minute: '2-digit', timeZone: TZ
+    })
   } catch { return '' }
+}
+
+function formatHoursMin(approvedHours: number | null, hoursSoFar: number | null): string {
+  const h = approvedHours ?? hoursSoFar
+  if (h == null) return '?'
+  const hrs = Math.floor(h)
+  const mins = Math.round((h - hrs) * 60)
+  if (mins === 0) return `${hrs} ч`
+  return `${hrs} ч ${mins} мин`
 }
 
 export default function ShiftPage() {
@@ -41,17 +57,17 @@ export default function ShiftPage() {
   const [shiftStatus, setShiftStatus] = useState<ShiftStatus | null>(null)
   const [currentPin, setCurrentPin] = useState('')
 
-  // Тестовый режим
+  // Тестовый режим (доступен только если IS_TEST_MODE=true И IS_LIVE_TEST=false)
   const [testDate, setTestDate] = useState(todayStr)
   const [testHours, setTestHours] = useState('8')
 
-  const isTestActive = IS_TEST_MODE && branch?.id === TEST_BRANCH_ID
+  // Тестовый UI показывается только когда IS_TEST_MODE=true И IS_LIVE_TEST=false
+  const isTestActive = IS_TEST_MODE && !IS_LIVE_TEST && branch?.id === TEST_BRANCH_ID
 
   useEffect(() => {
     api.getBranches().then(setBranches).catch(() => {})
   }, [])
 
-  // Called by PinPad — throws on error so PinPad shows it inline
   const handlePinSubmit = async (pin: string) => {
     if (isTestActive) {
       const status = await api.testShiftStatus(pin, branch!.id, testDate)
@@ -85,8 +101,9 @@ export default function ShiftPage() {
           )
         } else {
           const res = await api.closeShift(currentPin, branch.id)
-          const hours = res.approved_hours ?? shiftStatus.hours_so_far ?? '?'
-          setMessage(`${res.employee_name}, твоя смена закрыта. Спасибо за смену! Отработано: ${hours} ч.`)
+          setMessage(
+            `${res.employee_name}, твоя смена закрыта. Спасибо за смену!\nОтработано: ${formatHoursMin(res.approved_hours, shiftStatus.hours_so_far)}`
+          )
         }
       } else {
         // Открыть смену
@@ -99,7 +116,8 @@ export default function ShiftPage() {
           )
         } else {
           const res = await api.openShift(currentPin, branch.id)
-          setMessage(`${res.employee_name}, твоя смена открыта. Хорошей работы!`)
+          const now = formatTime(new Date().toISOString())
+          setMessage(`${res.employee_name}, твоя смена открыта. Хорошей работы!\nВремя открытия: ${now}`)
         }
       }
       setMode('success')
@@ -124,7 +142,6 @@ export default function ShiftPage() {
     setActionError('')
   }
 
-  // «Готово» → back to same branch PIN entry
   const done = () => {
     setMode('enter_pin')
     setShiftStatus(null)
@@ -135,7 +152,19 @@ export default function ShiftPage() {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
-      <h1 className="text-2xl font-bold text-brand">Аппетит — Смены</h1>
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-2xl font-bold text-brand">Аппетит — Смены</h1>
+        {IS_LIVE_TEST && (
+          <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">
+            🟢 Реальный тест — время фиксируется автоматически
+          </span>
+        )}
+        {IS_TEST_MODE && !IS_LIVE_TEST && (
+          <span className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full">
+            🧪 Тестовый режим
+          </span>
+        )}
+      </div>
 
       {/* STEP 1 — Choose branch */}
       {mode === 'select_branch' && (
@@ -163,7 +192,7 @@ export default function ShiftPage() {
             <p className="text-gray-500 text-sm mt-1">Введите PIN для отметки смены</p>
           </div>
 
-          {/* Тестовый режим: выбор даты */}
+          {/* Тестовый режим: выбор даты (скрыт в LIVE_TEST_MODE) */}
           {isTestActive && (
             <div className="w-full max-w-xs bg-yellow-50 border border-yellow-300 rounded-xl p-4">
               <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-2">
@@ -191,7 +220,7 @@ export default function ShiftPage() {
         </div>
       )}
 
-      {/* STEP 3 — Confirm action based on shift status */}
+      {/* STEP 3 — Confirm action */}
       {mode === 'confirm_action' && shiftStatus && branch && (
         <div className="flex flex-col items-center gap-5 w-full max-w-sm text-center">
           <h2 className="text-lg font-semibold">
@@ -217,7 +246,7 @@ export default function ShiftPage() {
               <p className="text-gray-400 text-sm mb-5">Смена ещё не открыта</p>
             )}
 
-            {/* Тестовый режим: поле часов при закрытии */}
+            {/* Тестовый режим: поле часов (скрыто в LIVE_TEST_MODE) */}
             {isTestActive && shiftStatus.has_open_shift && (
               <div className="mb-4">
                 <label className="flex flex-col gap-1 text-sm text-left">
@@ -235,7 +264,7 @@ export default function ShiftPage() {
             )}
 
             {actionError && (
-              <p className="text-red-500 text-sm mb-3">{actionError}</p>
+              <p className="text-red-500 text-sm mb-3 whitespace-pre-line">{actionError}</p>
             )}
 
             {shiftStatus.has_open_shift ? (

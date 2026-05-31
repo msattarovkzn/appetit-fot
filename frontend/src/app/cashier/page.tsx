@@ -5,7 +5,12 @@ import { api } from '@/lib/api'
 
 // Тестовый режим: только development + только Челябинск (branch_id=1)
 const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true'
+// LIVE_TEST_MODE: реальное время, тестовый UI скрыт
+const IS_LIVE_TEST = process.env.NEXT_PUBLIC_LIVE_TEST_MODE === 'true'
 const TEST_BRANCH_ID = 1
+
+// Временная зона Екатеринбурга / Челябинска (UTC+5)
+const TZ = 'Asia/Yekaterinburg'
 
 type Mode = 'select_branch' | 'enter_pin' | 'status_card' | 'close_form' | 'success'
 
@@ -26,7 +31,7 @@ function todayStr() {
 function formatTime(iso: string | null): string {
   if (!iso) return ''
   try {
-    return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
   } catch { return '' }
 }
 
@@ -47,7 +52,8 @@ export default function CashierPage() {
   const [testDate, setTestDate] = useState(todayStr)
   const [resetting, setResetting] = useState(false)
 
-  const isTestActive = IS_TEST_MODE && branch?.id === TEST_BRANCH_ID
+  // Тестовый UI активен только если IS_TEST_MODE=true И IS_LIVE_TEST=false
+  const isTestActive = IS_TEST_MODE && !IS_LIVE_TEST && branch?.id === TEST_BRANCH_ID
   const closeDate = isTestActive ? testDate : todayStr()
 
   useEffect(() => {
@@ -192,7 +198,19 @@ export default function CashierPage() {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-6 bg-gray-50">
-      <h1 className="text-2xl font-bold text-brand">Аппетит — Кассир</h1>
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-2xl font-bold text-brand">Аппетит — Кассир</h1>
+        {IS_LIVE_TEST && (
+          <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">
+            🟢 Реальный тест — дата и время фиксируются автоматически
+          </span>
+        )}
+        {IS_TEST_MODE && !IS_LIVE_TEST && (
+          <span className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full">
+            🧪 Тестовый режим
+          </span>
+        )}
+      </div>
 
       {/* ШАГ 1: Выбор филиала */}
       {mode === 'select_branch' && (
