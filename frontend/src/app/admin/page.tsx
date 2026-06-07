@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import ChangePasswordButton from '@/components/ChangePasswordButton'
 
 const CAT: Record<string, string> = {
   admin: 'Администрация', kitchen: 'Кухня',
@@ -177,7 +178,6 @@ export default function AdminPage() {
         {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
         <button onClick={handleLogin}
           className="bg-brand text-white py-3 rounded-xl font-semibold hover:bg-red-700">Войти</button>
-        <p className="text-xs text-gray-400 text-center">owner / owner123 · accountant1 / accountant123</p>
       </div>
     </main>
   )
@@ -186,12 +186,15 @@ export default function AdminPage() {
     <main className="p-4 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6 mt-4">
         <h1 className="text-2xl font-bold text-brand">Бухгалтерия</h1>
-        <button onClick={() => {
-          localStorage.removeItem('token')
-          localStorage.removeItem('role')
-          localStorage.removeItem('full_name')
-          setToken(null)
-        }} className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        <div className="flex items-center gap-3">
+          <ChangePasswordButton />
+          <button onClick={() => {
+            localStorage.removeItem('token')
+            localStorage.removeItem('role')
+            localStorage.removeItem('full_name')
+            setToken(null)
+          }} className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        </div>
       </div>
 
       {/* Быстрый доступ */}

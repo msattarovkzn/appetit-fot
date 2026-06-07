@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import ChangePasswordButton from '@/components/ChangePasswordButton'
 
 const STATUS_BG: Record<string, string> = {
   green:  'bg-green-100 text-green-800 border-green-200',
@@ -68,7 +69,6 @@ export default function ManagerPage() {
         {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
         <button onClick={handleLogin}
           className="bg-brand text-white py-3 rounded-xl font-semibold hover:bg-red-700">Войти</button>
-        <p className="text-xs text-gray-400 text-center">manager1 / manager123</p>
       </div>
     </main>
   )
@@ -87,6 +87,7 @@ export default function ManagerPage() {
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block" />
             Кто сейчас на смене
           </a>
+          <ChangePasswordButton />
           <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
             className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
         </div>

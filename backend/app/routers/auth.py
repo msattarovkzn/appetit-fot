@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.employee import Employee
-from app.schemas.auth import LoginRequest, TokenResponse, PinRequest
-from app.utils.security import verify_password, verify_pin, create_access_token
+from app.schemas.auth import LoginRequest, TokenResponse, PinRequest, ChangePasswordRequest
+from app.utils.security import verify_password, verify_pin, create_access_token, hash_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,3 +46,19 @@ async def verify_employee_pin(body: PinRequest, db: AsyncSession = Depends(get_d
             return {"id": emp.id, "full_name": emp.full_name}
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный PIN")
+
+
+@router.patch("/me/password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный текущий пароль")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Пароль должен быть не короче 6 символов")
+
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return {"ok": True}

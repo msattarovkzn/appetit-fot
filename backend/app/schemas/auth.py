@@ -18,3 +18,8 @@ class TokenResponse(BaseModel):
 class PinRequest(BaseModel):
     pin: str
     branch_id: int
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str

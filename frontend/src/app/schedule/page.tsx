@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import ChangePasswordButton from '@/components/ChangePasswordButton'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -575,7 +576,6 @@ export default function SchedulePage() {
             className="bg-brand text-white py-3 rounded-xl font-semibold hover:bg-red-700">
             Войти
           </button>
-          <p className="text-xs text-gray-400 text-center">manager1 / manager123</p>
         </div>
       </main>
     )
@@ -648,6 +648,7 @@ export default function SchedulePage() {
               </button>
             )}
 
+            <ChangePasswordButton />
             <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 ml-1">
               Выйти
             </button>

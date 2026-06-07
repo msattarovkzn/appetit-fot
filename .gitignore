@@ -37,6 +37,10 @@ desktop.ini
 # Git worktrees
 .worktrees/
 
+# Приватные файлы — НЕ публиковать
+docs/*-PRIVATE.md
+docker-compose.override.yml
+
 # Другие проекты в этой папке (не appetit-fot)
 Аппетит/
 appetit-game-v2/

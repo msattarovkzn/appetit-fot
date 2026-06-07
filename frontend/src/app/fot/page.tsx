@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import ChangePasswordButton from '@/components/ChangePasswordButton'
 
 const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true'
 const TEST_BRANCH_ID = 1
@@ -304,7 +305,6 @@ export default function FotPage() {
           className="bg-brand text-white py-3 rounded-xl font-semibold hover:bg-red-700">
           Войти
         </button>
-        <p className="text-xs text-gray-400 text-center">owner / owner123 · accountant1 / accountant123</p>
       </div>
     </main>
   )
@@ -346,6 +346,7 @@ export default function FotPage() {
               </span>
             )}
           </h1>
+          <ChangePasswordButton />
           <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
             className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
         </div>
@@ -499,8 +500,11 @@ export default function FotPage() {
     <main className="p-4 max-w-6xl mx-auto">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6 mt-4">
         <h1 className="text-2xl font-bold text-brand">ФОТ — Сеть филиалов</h1>
-        <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
-          className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        <div className="flex items-center gap-3">
+          <ChangePasswordButton />
+          <button onClick={() => { localStorage.removeItem('token'); setToken(null) }}
+            className="text-sm text-gray-400 hover:text-gray-600">Выйти</button>
+        </div>
       </div>
 
       <DateFilter />

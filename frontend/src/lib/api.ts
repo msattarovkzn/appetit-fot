@@ -23,6 +23,11 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ username, password }) }
     ),
 
+  changePassword: (old_password: string, new_password: string) =>
+    request<{ ok: boolean }>('/auth/me/password', {
+      method: 'PATCH', body: JSON.stringify({ old_password, new_password }),
+    }),
+
   verifyPin: (pin: string, branch_id: number) =>
     request<{ id: number; full_name: string }>(
       '/auth/pin-verify',
