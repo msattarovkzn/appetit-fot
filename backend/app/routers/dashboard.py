@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.branch import Branch
 from app.models.employee import Employee
-from app.models.payroll import FotSummary, FotStatus, PayrollEntry
+from app.models.payroll import FotSummary, PayrollEntry
 from app.models.shift import Shift, ShiftStatus
 from app.models.report import BranchDailyReport
 from app.models.user import User
@@ -17,26 +17,14 @@ from app.schemas.report import DashboardDay
 from app.schemas.dashboard import (
     BranchFotSummary, BranchFotDetail, NetworkFotSummary, EmployeePayrollRow,
 )
+from app.business_rules import (
+    fot_status_total as _status_total,
+    fot_status_kitchen as _status_kitchen,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 ZERO = Decimal("0")
-
-
-def _status_total(pct: Decimal) -> FotStatus:
-    if pct < Decimal("27.5"):
-        return FotStatus.green
-    if pct <= Decimal("29"):
-        return FotStatus.yellow
-    return FotStatus.red
-
-
-def _status_kitchen(pct: Decimal) -> FotStatus:
-    if pct < Decimal("14.5"):
-        return FotStatus.green
-    if pct <= Decimal("15.5"):
-        return FotStatus.yellow
-    return FotStatus.red
 
 
 def _safe_pct(numerator: Decimal, denominator: Decimal) -> Decimal | None:

@@ -23,6 +23,7 @@ from app.services.payroll import calculate_payroll_for_day
 from app.services.bot import send_telegram, build_close_message
 from app.services.audit import log_action
 from app.utils.security import verify_pin
+from app.business_rules import cashier_bonus as _cashier_bonus
 
 router = APIRouter(prefix="/cashier", tags=["cashier"])
 
@@ -76,13 +77,6 @@ async def check_cashier_pin(body: CashierCheckPinRequest, db: AsyncSession = Dep
         opened_at=shift.opened_at if shift else None,
         hours_so_far=hours_so_far,
     )
-
-
-def _cashier_bonus(orders_count: int, work_date: date_type) -> Decimal:
-    """Бонус кассира: Пн–Чт+Вс = 7₽/заказ, Пт–Сб = 5₽/заказ."""
-    weekday = work_date.weekday()  # 0=Пн, 4=Пт, 5=Сб, 6=Вс
-    rate = Decimal("5") if weekday in (4, 5) else Decimal("7")
-    return Decimal(orders_count) * rate
 
 
 @router.post("/extra-shift/open")

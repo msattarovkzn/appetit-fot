@@ -15,7 +15,7 @@ from app.models.employee import Employee, EmployeeRate
 from app.models.position import Position, PositionCategory
 from app.models.user import User
 from app.models.shift import Shift, ShiftStatus
-from app.models.payroll import PayrollEntry, FotSummary, FotStatus
+from app.models.payroll import PayrollEntry, FotSummary
 from app.models.report import BranchDailyReport
 from app.models.schedule import SchedulePlan
 from app.models.branch import Branch
@@ -26,20 +26,12 @@ from app.schemas.admin import (
     RateCreate, RateOut,
 )
 from app.utils.security import hash_pin, make_pin_check
+from app.business_rules import (
+    fot_status_total as _fot_status_total,
+    fot_status_kitchen as _fot_status_kitchen,
+)
 
 ZERO = Decimal("0")
-
-
-def _fot_status_total(pct: Decimal) -> FotStatus:
-    if pct < Decimal("27.5"): return FotStatus.green
-    if pct <= Decimal("29"): return FotStatus.yellow
-    return FotStatus.red
-
-
-def _fot_status_kitchen(pct: Decimal) -> FotStatus:
-    if pct < Decimal("14.5"): return FotStatus.green
-    if pct <= Decimal("15.5"): return FotStatus.yellow
-    return FotStatus.red
 
 
 async def _recalculate_fot_summary(db: AsyncSession, branch_id: int, work_date: date) -> None:

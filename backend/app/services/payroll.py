@@ -6,34 +6,12 @@ from sqlalchemy.orm import selectinload
 
 from app.models.employee import Employee, EmployeeRate
 from app.models.shift import Shift, ShiftStatus
-from app.models.payroll import PayrollEntry, FotSummary, FotStatus
+from app.models.payroll import PayrollEntry, FotSummary
 from app.models.position import PositionCategory, PaymentType
 from app.models.report import BranchDailyReport
+from app.business_rules import fot_status_total, fot_status_kitchen, cashier_bonus
 
 ZERO = Decimal("0")
-
-
-def fot_status_total(pct: Decimal) -> FotStatus:
-    if pct < Decimal("27.5"):
-        return FotStatus.green
-    if pct <= Decimal("29"):
-        return FotStatus.yellow
-    return FotStatus.red
-
-
-def fot_status_kitchen(pct: Decimal) -> FotStatus:
-    if pct < Decimal("14.5"):
-        return FotStatus.green
-    if pct <= Decimal("15.5"):
-        return FotStatus.yellow
-    return FotStatus.red
-
-
-def _admin_bonus(orders_count: int, day_of_week: int) -> Decimal:
-    """Бонус для кассира-администратора. Пн-Чт+Вс=7₽/заказ, Пт-Сб=5₽/заказ."""
-    # Mon=0 Tue=1 Wed=2 Thu=3 Fri=4 Sat=5 Sun=6
-    rate_per_order = 7 if day_of_week in (0, 1, 2, 3, 6) else 5
-    return Decimal(orders_count * rate_per_order)
 
 
 def _active_rate(rates: list[EmployeeRate], for_date: date) -> EmployeeRate | None:
@@ -83,7 +61,6 @@ async def calculate_payroll_for_day(
     """
     work_date = report.date
     orders_count = report.orders_count          # только orders_count, takeaway_count не используется
-    day_of_week = work_date.weekday()           # Mon=0 … Sun=6
 
     # ── 0. Очистить старые записи перед (пере)расчётом ──────────────────────────
     # Защита от дублей при повторном вызове по тому же report_id
@@ -168,7 +145,7 @@ async def calculate_payroll_for_day(
                 and emp.id == cashier_employee_id
                 and not cashier_bonus_given
             ):
-                bonus = _admin_bonus(orders_count, day_of_week)
+                bonus = cashier_bonus(orders_count, work_date)
                 cashier_bonus_given = True
             else:
                 bonus = ZERO
