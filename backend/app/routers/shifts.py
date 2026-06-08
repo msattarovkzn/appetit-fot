@@ -17,6 +17,23 @@ from app.utils.security import verify_pin
 router = APIRouter(prefix="/shifts", tags=["shifts"])
 
 
+def _short_name(full_name: str) -> str:
+    """Сократить ФИО для публичного экрана мониторинга (без полного имени).
+
+    Формат хранения — "Фамилия Имя [Отчество]":
+      - 3 слова  → "Фамилия Имя Отчество" → "Имя Ф."
+      - 2 слова  → "Фамилия Имя"          → "Имя Ф."
+      - 1 слово  → как есть
+
+    Примеры: "Иванов Иван Петрович" → "Иван И.", "Иванова Мария" → "Мария И.",
+    "Иван" → "Иван".
+    """
+    parts = full_name.split()
+    if len(parts) >= 2:
+        return f"{parts[1]} {parts[0][0]}."
+    return full_name
+
+
 async def _find_employee_by_pin(db: AsyncSession, pin: str, branch_id: int) -> Employee:
     result = await db.execute(
         select(Employee).where(Employee.branch_id == branch_id, Employee.is_active == True)
@@ -213,7 +230,7 @@ async def live_shifts(
         minutes_on = int((now - opened).total_seconds() / 60) if opened else None
         by_branch[bid]["shifts"].append({
             "id": s.id,
-            "employee_name": s.employee.full_name if s.employee else "—",
+            "employee_name": _short_name(s.employee.full_name) if s.employee else "—",
             "position": s.employee.position.name if s.employee and s.employee.position else "—",
             "category": s.employee.position.category.value if s.employee and s.employee.position else "—",
             "is_extra_shift": s.is_extra_shift,
