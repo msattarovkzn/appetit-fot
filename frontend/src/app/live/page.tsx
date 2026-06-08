@@ -1,7 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 
-const TZ = 'Asia/Yekaterinburg'
+// Челябинск живёт по времени Екатеринбурга (UTC+5), остальные филиалы (Казань) — по московскому (UTC+3)
+function tzForBranch(name: string | null | undefined): string {
+  return name?.includes('Челябинск') ? 'Asia/Yekaterinburg' : 'Europe/Moscow'
+}
 const CAT_RU: Record<string, string> = {
   kitchen: 'Кухня', admin: 'Администрация', tech: 'Техперсонал',
   courier: 'Курьеры', reserve: 'Резерв',
@@ -14,10 +17,10 @@ const CAT_COLOR: Record<string, string> = {
   reserve: 'bg-gray-100 text-gray-600',
 }
 
-function fmtTime(iso: string | null) {
+function fmtTime(iso: string | null, branchName: string | null | undefined) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('ru-RU', {
-    hour: '2-digit', minute: '2-digit', timeZone: TZ,
+    hour: '2-digit', minute: '2-digit', timeZone: tzForBranch(branchName),
   })
 }
 
@@ -94,7 +97,7 @@ export default function LivePage() {
         <div className="text-right">
           {lastUpdate && (
             <p className="text-sm text-gray-400">
-              Обновлено: {lastUpdate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: TZ })}
+              Обновлено: {lastUpdate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
           )}
           <p className="text-xs text-gray-500">Авто-обновление каждые 30 сек</p>
@@ -119,10 +122,12 @@ export default function LivePage() {
             <p className="text-sm text-gray-400 mt-1">Активных филиалов</p>
           </div>
           <div className="bg-gray-800 rounded-xl p-4 text-center">
-            <p className="text-xl font-bold text-gray-300">
-              {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: TZ })}
+            <p className="text-base font-bold text-gray-300">
+              МСК {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}
+              {' / '}
+              ЕКБ {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Yekaterinburg' })}
             </p>
-            <p className="text-sm text-gray-400 mt-1">Время (Екатеринбург)</p>
+            <p className="text-sm text-gray-400 mt-1">Время (Казань / Челябинск)</p>
           </div>
         </div>
       )}
@@ -174,7 +179,7 @@ export default function LivePage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-green-400">
-                        с {fmtTime(s.opened_at)}
+                        с {fmtTime(s.opened_at, branch.branch_name)}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {fmtDuration(s.minutes_on)}

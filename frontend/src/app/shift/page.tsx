@@ -9,8 +9,10 @@ const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true'
 const IS_LIVE_TEST = process.env.NEXT_PUBLIC_LIVE_TEST_MODE === 'true'
 const TEST_BRANCH_ID = 1
 
-// Временная зона Челябинска / Екатеринбурга (UTC+5)
-const TZ = 'Asia/Yekaterinburg'
+// Челябинск живёт по времени Екатеринбурга (UTC+5), остальные филиалы (Казань) — по московскому (UTC+3)
+function tzForBranch(name: string | null | undefined): string {
+  return name?.includes('Челябинск') ? 'Asia/Yekaterinburg' : 'Europe/Moscow'
+}
 
 type Mode = 'select_branch' | 'enter_pin' | 'confirm_action' | 'success'
 
@@ -29,11 +31,11 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null, branchName: string | null | undefined): string {
   if (!iso) return ''
   try {
     return new Date(iso).toLocaleTimeString('ru-RU', {
-      hour: '2-digit', minute: '2-digit', timeZone: TZ
+      hour: '2-digit', minute: '2-digit', timeZone: tzForBranch(branchName)
     })
   } catch { return '' }
 }
@@ -116,7 +118,7 @@ export default function ShiftPage() {
           )
         } else {
           const res = await api.openShift(currentPin, branch.id)
-          const now = formatTime(new Date().toISOString())
+          const now = formatTime(new Date().toISOString(), branch.name)
           setMessage(`${res.employee_name}, твоя смена открыта. Хорошей работы!\nВремя открытия: ${now}`)
         }
       }
@@ -237,7 +239,7 @@ export default function ShiftPage() {
 
             {shiftStatus.has_open_shift ? (
               <div className="text-gray-600 text-sm mb-5 space-y-1">
-                <p>🕐 Смена открыта с <span className="font-semibold">{formatTime(shiftStatus.opened_at)}</span></p>
+                <p>🕐 Смена открыта с <span className="font-semibold">{formatTime(shiftStatus.opened_at, branch?.name)}</span></p>
                 {!isTestActive && shiftStatus.hours_so_far != null && (
                   <p>Уже отработано: <span className="font-semibold">{shiftStatus.hours_so_far} ч.</span></p>
                 )}
